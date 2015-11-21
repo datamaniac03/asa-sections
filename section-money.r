@@ -18,6 +18,9 @@ library(ggplot2)
 library(scales)
 library(MASS)
 library(stringr)
+library(splines)
+library(quantreg)
+
 
 my.colors <- function (palette = "cb") {
     cb.palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
@@ -49,10 +52,9 @@ ifelse(!dir.exists(file.path("figures")),
 ###--------------------------------------------------
 
 data <- read.csv("data/asa-section-membership.csv", header=TRUE)
-data$Sname <- str_replace(data$Sname, "Comm/Urban", "Comm\\\nUrban")
-data$Sname <- str_replace(data$Sname, "Mental Health", "Mental\\\nHealth")
-data$Section <- str_replace(data$Section, "\\(.*\\)", "")
-
+## data$Sname <- str_replace(data$Sname, "Comm/Urban", "Comm\\\nUrban")
+## data$Sname <- str_replace(data$Sname, "Mental Health", "Mental\\\nHealth")
+## data$Section <- str_replace(data$Section, "\\(.*\\)", "")
 data$Sname <- str_trim(data$Sname)
 
 
@@ -151,3 +153,199 @@ p + geom_vline(color = "gray70") +
     labs(x = "End of Year Balance",
          y = "") + ggtitle("End of Year Balance")
 dev.off()
+
+
+###--------------------------------------------------
+
+
+###--------------------------------------------------
+### Membership Trends
+###--------------------------------------------------
+
+
+library(tidyr)
+library(dplyr)
+
+yrs <- colnames(data) %in% paste("X", 2005:2015, sep="")
+
+data.m <- subset(data, select = c("Sname", colnames(data)[yrs]))
+
+data.m <- gather(data.m, Year, Members, X2005:X2015)
+
+## data.m$Year <- as.Date(strptime(str_replace(data.m$Year, "X", ""),
+## format="%Y"))
+
+data.m$Year <- as.integer(str_replace(data.m$Year, "X", ""))
+
+trend.tab <- data.m %>% group_by(Year) %>%
+    mutate(yr.tot = sum(Members, na.rm=TRUE)) %>%
+    group_by(Sname) %>%
+    na.omit() %>%
+    mutate(Ave = mean(Members, na.rm=TRUE),
+           Dif = Members - Ave,
+           Pct.All = round((Members/yr.tot*100), 2),
+           Age = length(Members)) %>%
+    group_by(Sname) %>%
+    mutate(Index = (Members / first(Members, order_by = Year))*100,
+           AveInd = mean(Index))
+
+
+index.labs <- trend.tab %>%
+    filter(Year == 2015) %>%
+    ungroup() %>%
+    filter(min_rank(desc(Index)) < 12 | min_rank(desc(Index)) > 44)
+
+
+index.low <- trend.tab %>%
+    filter(Year == 2015) %>%
+    ungroup() %>%
+    filter(min_rank(Index) < 12)
+
+
+index.high <- trend.tab %>%
+    filter(Year == 2015) %>%
+    ungroup() %>%
+    filter(min_rank(desc(Index)) < 12)
+
+
+
+
+ind.all <- trend.tab$Sname %in% index.labs$Sname
+ind.low <- trend.tab$Sname %in% index.low$Sname
+ind.high <- trend.tab$Sname %in% index.high$Sname
+
+
+trend.tab$Track.all <- ind.all
+trend.tab$Track.low <- ind.low
+trend.tab$Track.high <- ind.high
+
+
+
+pdf(file="figures/sections-estd-index-decline.pdf", height=7, width=10)
+
+p <- ggplot(subset(trend.tab, Age==11 & AveInd < 105),
+            aes(x=Year, y=Index, group=Sname, color = Track.low))
+
+p + geom_smooth(method = "rqss", formula = y ~ qss(x), se = FALSE) +
+    geom_hline(yintercept = 100) +
+    geom_text(data=subset(index.low, Age==11 & AveInd < 105),
+              aes(x=Year+0.2, y=Index+rnorm(1, sd=0.8),
+                  label=Sname,
+                  lineheight=0.8),
+              hjust = 0,
+              color = "black",
+              size = 2.9) +
+    expand_limits(x = c(2005:2016)) +
+    scale_color_manual(values = my.colors("bly")[c(3, 1)]) +
+    scale_x_continuous(breaks = c(seq(2005, 2015, 3))) +
+    guides(color = FALSE) +
+    ggtitle("Declining Sections. 2005 = 100")
+
+credit("Smoothed estimator. Excludes sections founded since 2005.")
+
+dev.off()
+
+
+
+pdf(file="figures/sections-estd-index-rise.pdf", height=7, width=10)
+
+p <- ggplot(subset(trend.tab, Age==11 & AveInd > 104),
+            aes(x=Year, y=Index, group=Sname, color = Track.high))
+
+p + geom_smooth(method = "rqss", formula = y ~ qss(x), se = FALSE) +
+    geom_hline(yintercept = 100) +
+    geom_text(data=subset(index.high, Age==11 & AveInd > 104),
+              aes(x=Year+0.2, y=Index,
+                  label=Sname,
+                  lineheight=0.8),
+              hjust = 0,
+              color = "black",
+              size = 2.9) +
+    expand_limits(x = c(2005:2016)) +
+    scale_color_manual(values = my.colors("bly")[c(3, 1)]) +
+    scale_x_continuous(breaks = c(seq(2005, 2015, 3))) +
+    guides(color = FALSE) +
+    ggtitle("Rising Sections. 2005 = 100")
+
+credit("Smoothed estimator. Excludes sections founded since 2005.")
+
+dev.off()
+
+
+
+index.sub <- trend.tab %>%
+    filter(Year == 2015 & Age < 10)
+
+
+
+pdf(file="figures/sections-new-index-growth.pdf", height=6, width=8)
+p <- ggplot(subset(trend.tab, Age<10), aes(x=Year, y=Members, group=Sname))
+p + geom_line(color = my.colors("bly")[2]) +
+    geom_text(data=subset(index.sub),
+              aes(x=Year, y=Members,
+                  label=Sname,
+                  lineheight=0.6),
+              hjust = 0,
+              color = "black",
+              size = 3) +
+    expand_limits(x = c(2008:2016)) +
+    scale_x_continuous(breaks = c(seq(2008, 2015, 3))) +
+    guides(color = FALSE) +
+    ggtitle("ASA Sections Founded Since 2005")
+## credit("Smoothed Estimator.")
+dev.off()
+
+pdf(file = "figures/sections-faceted.pdf", height = 12, width = 10)
+ind <- trend.tab %>%
+    group_by(Sname) %>%
+    summarize(Ave = mean(Members, na.rm =TRUE)) %>%
+    mutate(Rank = order(Ave, decreasing = TRUE))
+
+trend.tab$Sname2 <- factor(trend.tab$Sname,
+                           levels = ind$Sname[ind$Rank],
+                           ordered = TRUE)
+
+
+p <- ggplot(trend.tab, aes(x=Year, y=Members, group=Sname2))
+p + geom_line(color=my.colors("bly")[2]) +
+    scale_x_continuous(breaks = c(seq(2005, 2015, 4))) +
+    facet_wrap(~ Sname2, ncol = 7)
+credit("Excludes sections founded since 2005.")
+
+dev.off()
+
+
+plot.section <- function(section="Culture",
+                         x = "Year",
+                         y = "Members",
+                         data = trend.tab,
+                         smooth=FALSE){
+
+    p <- ggplot(subset(data, Sname2==section),
+            aes_string(x=x, y=y))
+
+    if(smooth == TRUE) {
+        p0 <- p + geom_smooth(color = my.colors("bly")[2],
+                              size = 1.2,
+                              method = "lm",
+                              formula = y ~ ns(x, 3)) +
+            scale_x_continuous(breaks = c(seq(2005, 2015, 4))) +
+            ggtitle(section)
+    } else {
+
+    p0 <- p + geom_line(color=my.colors("bly")[2], size=1.2) +
+        scale_x_continuous(breaks = c(seq(2005, 2015, 4))) +
+        ggtitle(section)
+
+    }
+
+    print(p0)
+
+}
+
+
+plot.section("Rationality")
+
+plot.section("OOW", smooth = TRUE)
+
+plot.section("Crim")
