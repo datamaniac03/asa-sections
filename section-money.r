@@ -351,3 +351,73 @@ plot.section("Rationality")
 plot.section("OOW", smooth = TRUE)
 
 plot.section("Crim")
+
+###--------------------------------------------------
+### quasi shingles
+###--------------------------------------------------
+
+### See http://learnr.files.wordpress.com/2009/08/latbook_time1.pdf, p31
+
+make.shingles <- function(data = trend.tab$Members, vname = "Members", number = 4, ...) {
+    intrv <- as.data.frame(co.intervals(data, number, ...))
+    intrv <<- round(intrv, 0) ## Create object outside fn
+    Members <- sort(unique(data))
+    intervals <- plyr::ldply(Members, function(x) {
+      t(as.numeric(x < intrv$V2 & x > intrv$V1))
+    })
+    tmp <- reshape2::melt(cbind(Members, intervals), id.var = 1)
+    out <- tmp[tmp$value > 0, 1:2]
+    colnames(out)[1] <- vname
+    return(out)
+}
+
+trend.ordered <- merge(trend.tab, make.shingles())
+
+intrv <- with(intrv, paste(V1, V2, sep = "-"))
+trend.ordered <- plyr::rename(trend.ordered, c(variable = "Range"))
+
+trend.ordered$Range <- factor(trend.ordered$Range, labels = intrv)
+
+
+p <- ggplot(trend.ordered,
+             aes(x = Year,
+                 y = Members,
+                 group = Sname2,
+                 label = FALSE))
+
+p + geom_line(color = "gray70") +
+    facet_grid(~ Range) +
+    labs(x = "Year", y = "Members") +
+    scale_x_continuous(breaks = c(seq(2005, 2015, 4))) +
+    theme(legend.position = "none")
+
+
+rev.shingle <- merge(data, make.shingles(data=data$X2014, vname = "X2014"))
+intrv <- with(intrv, paste(V1, V2, sep = "-"))
+rev.shingle <- plyr::rename(rev.shingle, c(variable = "Range"))
+rev.shingle$Range <- factor(rev.shingle$Range, labels = intrv)
+
+
+
+p <- ggplot(rev.shingle, aes(x=Revenues, y=Expenses, label = Sname))
+p + geom_smooth(method="lm", se=FALSE, color = "gray80") +
+    geom_point(aes(color = Journal,
+                   size = X2014),
+               pch = 21) +
+    geom_text(data=subset(rev.shingle, Expenses/Revenues > 1.3 | Expenses/Revenues < 0.7 | Revenues > 10000),
+              size = 2.2,
+              aes(x = Revenues + 35,
+                  hjust = 0,
+                  lineheight = 0.7)) +
+    facet_grid(~ Range, scales = "free") +
+    scale_color_manual(values = my.colors("bly")) +
+    scale_x_continuous(trans = log2_trans(), breaks = c(500, 1000, 5000, 20000) ,
+                       labels = dollar) +
+    scale_y_continuous(trans = log2_trans(), breaks = c(1000, 5000, 20000),
+                       labels = dollar) +
+    labs(x="Logged Dollar Revenues",
+         y="Logged Dollar Expenses",
+         color = "Section has own Journal",
+         size = "Membership") +
+    theme(legend.position = "bottom") +
+    ggtitle("ASA Sections, Revenues vs Expenses (2014)")
