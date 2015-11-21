@@ -321,6 +321,8 @@ plot.section <- function(section="Culture",
                          data = trend.tab,
                          smooth=FALSE){
 
+    ## Note use of aes_string() rather than aes() to pass arguments to
+    ## ggplot inside a function
     p <- ggplot(subset(data, Sname2==section),
             aes_string(x=x, y=y))
 
