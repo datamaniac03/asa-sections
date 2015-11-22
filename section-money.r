@@ -292,7 +292,6 @@ p + geom_line(color = my.colors("bly")[2]) +
     scale_x_continuous(breaks = c(seq(2008, 2015, 3))) +
     guides(color = FALSE) +
     ggtitle("ASA Sections Founded Since 2005")
-## credit("Smoothed Estimator.")
 dev.off()
 
 pdf(file = "figures/sections-faceted.pdf", height = 12, width = 10)
@@ -314,7 +313,7 @@ credit("Excludes sections founded since 2005.")
 
 dev.off()
 
-
+### Example of a convienience function to plot a particular section
 plot.section <- function(section="Culture",
                          x = "Year",
                          y = "Members",
@@ -345,7 +344,6 @@ plot.section <- function(section="Culture",
 
 }
 
-
 plot.section("Rationality")
 
 plot.section("OOW", smooth = TRUE)
@@ -353,7 +351,7 @@ plot.section("OOW", smooth = TRUE)
 plot.section("Crim")
 
 ###--------------------------------------------------
-### quasi shingles
+### Quasi shingle-plot
 ###--------------------------------------------------
 
 ### See http://learnr.files.wordpress.com/2009/08/latbook_time1.pdf, p31
@@ -397,7 +395,7 @@ intrv <- with(intrv, paste(V1, V2, sep = "-"))
 rev.shingle <- plyr::rename(rev.shingle, c(variable = "Range"))
 rev.shingle$Range <- factor(rev.shingle$Range, labels = intrv)
 
-
+pdf(file="figures/quasi-shingle-plot.pdf", height = 5, width = 15)
 
 p <- ggplot(rev.shingle, aes(x=Revenues, y=Expenses, label = Sname))
 p + geom_smooth(method="lm", se=FALSE, color = "gray80") +
@@ -421,3 +419,33 @@ p + geom_smooth(method="lm", se=FALSE, color = "gray80") +
          size = "Membership") +
     theme(legend.position = "bottom") +
     ggtitle("ASA Sections, Revenues vs Expenses (2014)")
+
+dev.off()
+
+pdf(file="figures/quasi-shingle-plot-nojournal.pdf", height = 6, width = 15)
+
+p <- ggplot(subset(rev.shingle, Journal == "No"), aes(x=Revenues, y=Expenses, label = Sname))
+p + geom_smooth(method="lm", se=FALSE, color = "gray80") +
+    geom_point(aes(size = X2014),
+               pch = 21) +
+    geom_text(data=subset(rev.shingle, Journal == "No" &
+                                       Expenses/Revenues > 1.3 |
+                                       Expenses/Revenues < 0.7 |
+                                       Revenues > 10000),
+              size = 2.2,
+              aes(x = Revenues + 35,
+                  hjust = 0,
+                  lineheight = 0.7)) +
+    facet_grid(~ Range, scales = "free") +
+    scale_color_manual(values = my.colors("bly")) +
+    scale_x_continuous(trans = log2_trans(), breaks = c(500, 1000, 5000, 20000) ,
+                       labels = dollar) +
+    scale_y_continuous(trans = log2_trans(), breaks = c(1000, 5000, 20000),
+                       labels = dollar) +
+    labs(x="Logged Dollar Revenues",
+         y="Logged Dollar Expenses",
+         size = "Membership") +
+    theme(legend.position = "bottom") +
+    ggtitle("ASA Sections, Revenues vs Expenses (2014)")
+
+dev.off()
