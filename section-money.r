@@ -449,3 +449,38 @@ p + geom_smooth(method="lm", se=FALSE, color = "gray80") +
     ggtitle("ASA Sections, Revenues vs Expenses (2014)")
 
 dev.off()
+
+###--------------------------------------------------
+### Lattice version of the shingle/coplot
+###--------------------------------------------------
+library(lattice)
+
+data$Range <- equal.count(data$X2015, 4)
+
+p <- xyplot(Expenses ~ X2015 | Range,
+            data = data,
+            fill.color = data$Journal,
+            cex = 1.1,
+            panel = function(x, y, fill.color, ..., subscripts) {
+                fill <- fill.color[subscripts]
+                panel.grid(h = -1, v = -1)
+                panel.lmline(x, y, col = "gray60", lwd=1.5)
+                panel.xyplot(x, y, pch = 21, fill = fill, ...)
+            },
+            xlab = "Members"
+            )
+
+
+print(p)
+
+p <- xyplot(Revenues ~ X2015 | Range,
+            data = subset(data, Journal == "No"),
+            cex = 1.1,
+            panel = function(x, y) {
+                panel.grid(h = -1, v = -1)
+                panel.lmline(x, y, lwd=1.5, col = "gray60")
+                panel.xyplot(x, y, pch = 21)
+            },
+            xlab = "Members")
+
+print(p)
