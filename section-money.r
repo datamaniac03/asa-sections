@@ -322,7 +322,7 @@ plot.section <- function(section="Culture",
 
     ## Note use of aes_string() rather than aes() to pass arguments to
     ## ggplot inside a function
-    p <- ggplot(subset(data, Sname2==section),
+    p <- ggplot(subset(data, Sname==section),
             aes_string(x=x, y=y))
 
     if(smooth == TRUE) {
@@ -349,6 +349,40 @@ plot.section("Rationality")
 plot.section("OOW", smooth = TRUE)
 
 plot.section("Crim")
+
+
+###--------------------------------------------------
+### Work on a function to make it a bit more general
+### e.g. passing through arguments.
+### Plenty more could be done, e.g. calculating breaks
+###--------------------------------------------------
+
+plot.section2 <- function(section="Culture", x = "Year",
+                         y = "Members", data = trend.tab,
+                         smooth=FALSE, ...){
+    require(ggplot2)
+    require(splines)
+    ## Note use of aes_string() rather than aes()
+    p <- ggplot(subset(data, Sname==section),
+            aes_string(x=x, y=y))
+
+    if(smooth == TRUE) {
+        p0 <- p + geom_smooth(color = my.colors("bly")[2],
+                              size = 1.2, ...) +
+            scale_x_continuous(breaks = c(seq(2005, 2015, 4))) +
+            ggtitle(section)
+        } else {
+    p0 <- p + geom_line(color=my.colors("bly")[2], size=1.2) +
+        scale_x_continuous(breaks = c(seq(2005, 2015, 4))) +
+        ggtitle(section)
+    }
+
+    print(p0)
+}
+
+plot.section2("Comm/Urban", smooth = TRUE, method = "loess")
+
+plot.section2("Children", smooth = TRUE, method = "lm", formula = y ~ ns(x, 2))
 
 ###--------------------------------------------------
 ### Quasi shingle-plot
